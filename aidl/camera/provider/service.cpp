@@ -17,6 +17,8 @@
 
 #define LOG_TAG "android.hardware.camera.provider-service.samsung"
 
+#include <csignal>
+
 #include "CameraProvider.h"
 
 #include <android-base/logging.h>
@@ -33,6 +35,18 @@ const int HWBINDER_THREAD_COUNT = 6;
 
 int main() {
     ALOGI("CameraProvider: samsung service is starting.");
+
+    // The Samsung camera libraries loaded below this service send OEM requests
+    // to the RIL daemon over the @VND_Multiclient socket without installing a
+    // SIGPIPE handler.  When the RIL side closes an idle connection, the write
+    // takes the whole process down with SIGPIPE - silently, with no tombstone -
+    // which kills every camera, not just the one being opened.  On y2q this is
+    // what made every non-main-lens session (ultrawide/telephoto/front, and
+    // zoomed video) fail with "camera session error": the provider restarted
+    // each time.  SIG_IGN survives exec, so the vendor libraries inherit it and
+    // those writes fail with EPIPE instead, which the camera code already
+    // tolerates.
+    signal(SIGPIPE, SIG_IGN);
 
     ABinderProcess_setThreadPoolMaxThreadCount(HWBINDER_THREAD_COUNT);
     ABinderProcess_startThreadPool();

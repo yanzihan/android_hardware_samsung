@@ -2,7 +2,14 @@ service vendor.camera.provider /vendor/bin/hw/android.hardware.camera.provider-s
     interface aidl android.hardware.camera.provider.ICameraProvider/internal/0
     class hal
     user cameraserver
-    group audio camera input drmrpc usb
+    # `system` is required: the Camera Hardware Interface writes the camera id remap
+    # table to /sys/class/camera/rear/supported_cameraIds, which the kernel driver
+    # creates as system:system 0664.  Without the group the HAL cannot write it, the
+    # remap fails, and every stream configuration is rejected ("sysfs open file
+    # failed", "EnumerateSensorModes() Unsupported capability", "pResult contains
+    # more buffers than the expected number of buffers").  The stock provider runs
+    # with the same group list as below.
+    group audio camera input drmrpc usb system
     ioprio rt 4
     capabilities SYS_NICE
     task_profiles CameraServiceCapacity MaxPerformance
